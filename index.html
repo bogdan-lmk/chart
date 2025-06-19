@@ -6,6 +6,57 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>WS playground</title>
   <link rel="stylesheet" href="/style.css">
+  <style>
+    .chart-controls {
+      margin-bottom: 20px;
+      padding: 15px;
+      background-color: #f5f5f5;
+      border-radius: 8px;
+    }
+    
+    .timeframe-selector {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    .timeframe-btn {
+      padding: 8px 16px;
+      background-color: #070227;
+      border: 2px solid #e0e0e0;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-weight: 500;
+    }
+    
+    .timeframe-btn:hover {
+      background-color: #020000;
+      transition: all 0.3s ease;
+    }
+    
+    .timeframe-btn.active {
+      background-color: #2962FF;
+      color: white;
+    }
+    
+    .chart-container {
+      margin-bottom: 30px;
+    }
+    
+    .chart-container h2 {
+      margin-bottom: 15px;
+      color: #333;
+      font-size: 1.5em;
+    }
+    
+    #chart, #btc-chart {
+      height: 400px;
+      width: 100%;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+    }
+  </style>
 </head>
 <body>
 <header class="logo">
@@ -15,14 +66,40 @@
   </a>
 </header>
 <main id="app">
+  <!-- Indicator Chart Section -->
   <section class="chart-container">
-    <h2>Chart Example in Trading View Chart</h2>
+    <h2>Indicator Chart (Lightweight Charts)</h2>
     <div id="chart"></div>
+  </section>
+
+  <!-- Bitcoin OHLC Chart Section -->
+  <section class="chart-container">
+    <h2>Bitcoin OHLC Chart (amCharts5)</h2>
+    
+    <!-- Timeframe Controls -->
+    <div class="chart-controls">
+      <div class="timeframe-selector">
+        <span><strong>Timeframe:</strong></span>
+        <button class="timeframe-btn active" data-timeframe="15m">15m</button>
+        <button class="timeframe-btn" data-timeframe="1h">1h</button>
+        <button class="timeframe-btn" data-timeframe="4h">4h</button>
+        <button class="timeframe-btn" data-timeframe="12h">12h</button>
+        <button class="timeframe-btn" data-timeframe="1d">1d</button>
+      </div>
+    </div>
+    
+    <div id="btc-chart"></div>
   </section>
 </main>
 <footer class="technologies">
   <img src="/technologies.svg" alt="List of supported technologies">
 </footer>
+
+<!-- amCharts5 Scripts -->
+<script src="https://cdn.amcharts.com/lib/5/index.js"></script>
+<script src="https://cdn.amcharts.com/lib/5/xy.js"></script>
+<script src="https://cdn.amcharts.com/lib/5/themes/Animated.js"></script>
+
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
