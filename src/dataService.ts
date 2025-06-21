@@ -75,39 +75,30 @@ function parseNumber(value: string): number {
 
 // Aggregate OHLC data for different timeframes
 function aggregateOHLCData(data: OHLCDataPoint[], multiplier: number): OHLCDataPoint[] {
-  if (multiplier === 1) {
-    return data; // Return original 15m data
-  }
+  if (multiplier === 1) return data;
 
   const aggregated: OHLCDataPoint[] = [];
-  
-  for (let i = 0; i < data.length; i += multiplier) {
+
+  let i = 0;
+  while (i < data.length) {
     const chunk = data.slice(i, i + multiplier);
-    
-    if (chunk.length === 0) continue;
-    
-    // Get the first timestamp of the period (start of the candle)
+    if (chunk.length === 0) break;
+
     const time = chunk[0].time;
-    
-    // Aggregate OHLC values
     const open = chunk[0].open;
     const close = chunk[chunk.length - 1].close;
     const high = Math.max(...chunk.map(item => item.high));
     const low = Math.min(...chunk.map(item => item.low));
     const volume = chunk.reduce((sum, item) => sum + item.volume, 0);
-    
-    aggregated.push({
-      time,
-      open,
-      high,
-      low,
-      close,
-      volume
-    });
+
+    aggregated.push({ time, open, high, low, close, volume });
+
+    i += multiplier; // сдвигаем окно
   }
-  
+
   return aggregated;
 }
+
 
 // Get aggregated data for specific timeframe
 function getDataForTimeframe(data: OHLCDataPoint[], timeframe: Timeframe): OHLCDataPoint[] {
