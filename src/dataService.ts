@@ -22,14 +22,18 @@ interface OHLCDataPoint {
 // Available timeframes
 export type Timeframe = '15m' | '1h' | '4h' | '12h' | '1d';
 
-// Timeframe multipliers (how many 15m periods in each timeframe)
-const TIMEFRAME_MULTIPLIERS: Record<Timeframe, number> = {
-  '15m': 1,   // 1 * 15m = 15m
-  '1h': 4,    // 4 * 15m = 1h
-  '4h': 16,   // 16 * 15m = 4h
-  '12h': 48,  // 48 * 15m = 12h
-  '1d': 96    // 96 * 15m = 1d
-};
+// Calculate milliseconds for each timeframe
+function getTimeframeMs(timeframe: Timeframe): number {
+  const now = new Date();
+  const msMap: Record<Timeframe, number> = {
+    '15m': 15 * 60 * 1000,
+    '1h': 60 * 60 * 1000,
+    '4h': 4 * 60 * 60 * 1000,
+    '12h': 12 * 60 * 60 * 1000,
+    '1d': 24 * 60 * 60 * 1000
+  };
+  return msMap[timeframe];
+}
 
 // Transform raw rows into DataPoints for the indicator chart
 function transformData(rawData: RawRow[]): DataPoint[] {
@@ -74,26 +78,48 @@ function parseNumber(value: string): number {
 }
 
 // Aggregate OHLC data for different timeframes
-function aggregateOHLCData(data: OHLCDataPoint[], multiplier: number): OHLCDataPoint[] {
-  if (multiplier === 1) return data;
+function aggregateOHLCData(data: OHLCDataPoint[], timeframeMs: number): OHLCDataPoint[] {
+  if (timeframeMs <= 15 * 60 * 1000) return data; // 15m or less
 
   const aggregated: OHLCDataPoint[] = [];
+  let currentWindowStart = data[0]?.time ? new Date(data[0].time * 1000) : new Date();
+  let currentWindowEnd = new Date(currentWindowStart.getTime() + timeframeMs);
+  let windowData: OHLCDataPoint[] = [];
 
-  let i = 0;
-  while (i < data.length) {
-    const chunk = data.slice(i, i + multiplier);
-    if (chunk.length === 0) break;
+  for (const point of data) {
+    const pointDate = new Date(point.time * 1000);
+    
+    if (pointDate < currentWindowEnd) {
+      windowData.push(point);
+    } else {
+      if (windowData.length > 0) {
+        const time = Math.floor(currentWindowStart.getTime() / 1000) as UTCTimestamp;
+        const open = windowData[0].open;
+        const close = windowData[windowData.length - 1].close;
+        const high = Math.max(...windowData.map(item => item.high));
+        const low = Math.min(...windowData.map(item => item.low));
+        const volume = windowData.reduce((sum, item) => sum + item.volume, 0);
 
-    const time = chunk[0].time;
-    const open = chunk[0].open;
-    const close = chunk[chunk.length - 1].close;
-    const high = Math.max(...chunk.map(item => item.high));
-    const low = Math.min(...chunk.map(item => item.low));
-    const volume = chunk.reduce((sum, item) => sum + item.volume, 0);
+        aggregated.push({ time, open, high, low, close, volume });
+      }
+
+      // Move to next window
+      currentWindowStart = new Date(currentWindowEnd);
+      currentWindowEnd = new Date(currentWindowStart.getTime() + timeframeMs);
+      windowData = [point];
+    }
+  }
+
+  // Add last window if it has data
+  if (windowData.length > 0) {
+    const time = Math.floor(currentWindowStart.getTime() / 1000) as UTCTimestamp;
+    const open = windowData[0].open;
+    const close = windowData[windowData.length - 1].close;
+    const high = Math.max(...windowData.map(item => item.high));
+    const low = Math.min(...windowData.map(item => item.low));
+    const volume = windowData.reduce((sum, item) => sum + item.volume, 0);
 
     aggregated.push({ time, open, high, low, close, volume });
-
-    i += multiplier; // сдвигаем окно
   }
 
   return aggregated;
@@ -102,8 +128,8 @@ function aggregateOHLCData(data: OHLCDataPoint[], multiplier: number): OHLCDataP
 
 // Get aggregated data for specific timeframe
 function getDataForTimeframe(data: OHLCDataPoint[], timeframe: Timeframe): OHLCDataPoint[] {
-  const multiplier = TIMEFRAME_MULTIPLIERS[timeframe];
-  return aggregateOHLCData(data, multiplier);
+  const timeframeMs = getTimeframeMs(timeframe);
+  return aggregateOHLCData(data, timeframeMs);
 }
 
 export const data = transformData(rawData);
@@ -116,7 +142,6 @@ export function getBitcoinDataForTimeframe(timeframe: Timeframe): OHLCDataPoint[
 
 // Helper function to get timeframe info
 export function getTimeframeInfo(timeframe: Timeframe): { multiplier: number; interval: string } {
-  const multiplier = TIMEFRAME_MULTIPLIERS[timeframe];
   const intervals: Record<Timeframe, string> = {
     '15m': '15 minutes',
     '1h': '1 hour',
@@ -126,7 +151,7 @@ export function getTimeframeInfo(timeframe: Timeframe): { multiplier: number; in
   };
   
   return {
-    multiplier,
+    multiplier: getTimeframeMs(timeframe),
     interval: intervals[timeframe]
   };
 }
