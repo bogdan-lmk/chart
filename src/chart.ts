@@ -22,7 +22,7 @@ const DEFAULT_CHART_OPTIONS = {
 };
 
 // Timeframe base intervals for amCharts5
-const TIMEFRAME_INTERVALS: Record<Timeframe, { timeUnit: am5.time.Unit; count: number }> = {
+const TIMEFRAME_INTERVALS: Record<Timeframe, any> = {
     '15m': { timeUnit: "minute", count: 15 },
     '1h': { timeUnit: "hour", count: 1 },
     '4h': { timeUnit: "hour", count: 4 },
@@ -59,7 +59,7 @@ export function setupChart(dataPoints: DataPoint[]): void {
 // Bitcoin OHLC chart setup with amCharts5
 let btcChart: am5.Root | null = null;
 let candlestickSeries: am5xy.CandlestickSeries | null = null;
-let xAxis: am5xy.DateAxis<am5xy.AxisRendererX> | null = null;
+let xAxis: am5xy.DateAxis<any> | null = null;
 
 export function setupBitcoinChart(ohlcData: OHLCDataPoint[], timeframe: Timeframe = '15m'): void {
     const container = getBtcChartContainer();
@@ -90,26 +90,39 @@ export function setupBitcoinChart(ohlcData: OHLCDataPoint[], timeframe: Timefram
     // Get timeframe interval
     const baseInterval = TIMEFRAME_INTERVALS[timeframe];
 
-    // Create X-axis (DateTime) with proper interval
+    // Create X-axis (DateTime) with proper interval - убираем ограничения
     xAxis = chart.xAxes.push(
         am5xy.DateAxis.new(btcChart, {
-            maxZoomCount: 50,
+            // Убираем maxZoomCount - это ограничивает количество отображаемых свечей
+            maxZoomCount: undefined,
+            // Устанавливаем минимальное количество для отображения всех данных
+            minZoomCount: 1,
             baseInterval: baseInterval,
             renderer: am5xy.AxisRendererX.new(btcChart, {
                 minorGridEnabled: true,
-                minGridDistance: 50
+                // Уменьшаем минимальное расстояние для отображения большего количества меток
+                minGridDistance: 30
             }),
-            tooltip: am5.Tooltip.new(btcChart, {})
+            tooltip: am5.Tooltip.new(btcChart, {}),
+            // Отключаем автоматическое скрытие меток
+            strictMinMax: false
         })
     );
 
-    // Create Y-axis (Value)
+    // Create Y-axis (Value) - улучшаем масштабирование
     const yAxis = chart.yAxes.push(
         am5xy.ValueAxis.new(btcChart, {
             renderer: am5xy.AxisRendererY.new(btcChart, {
-                pan: "zoom"
+                pan: "zoom",
+                // Улучшаем отображение меток на Y оси
+                minGridDistance: 20
             }),
-            tooltip: am5.Tooltip.new(btcChart, {})
+            tooltip: am5.Tooltip.new(btcChart, {}),
+            // Автоматическое масштабирование по данным
+            strictMinMax: false,
+            // Добавляем небольшие отступы сверху и снизу
+            extraMin: 0.02,
+            extraMax: 0.02
         })
     );
 
@@ -146,13 +159,25 @@ export function setupBitcoinChart(ohlcData: OHLCDataPoint[], timeframe: Timefram
 
     // Add cursor
     const cursor = chart.set("cursor", am5xy.XYCursor.new(btcChart, {
-        behavior: "zoomXY"
+        behavior: "none"
     }));
     cursor.lineY.set("visible", false);
+
+    // Настраиваем начальный зум для отображения всех данных
+    if (chartData.length > 0) {
+        // Показываем все данные при загрузке - используем setTimeout для корректной инициализации
+        setTimeout(() => {
+            if (xAxis) {
+                xAxis.zoomToValues(chartData[0].date, chartData[chartData.length - 1].date);
+            }
+        }, 100);
+    }
 
     // Make chart appear animated
     candlestickSeries.appear(1000);
     chart.appear(1000, 100);
+
+    console.log(`Bitcoin chart setup complete: ${chartData.length} candles for ${timeframe}`);
 }
 
 // Update Bitcoin chart with new timeframe data
@@ -182,9 +207,17 @@ export function updateBitcoinChart(ohlcData: OHLCDataPoint[], timeframe: Timefra
     // Update data with animation
     candlestickSeries.data.setAll(chartData);
     
-    // Zoom out to show all data
+    // Показываем все данные после обновления
     if (chartData.length > 0) {
-        xAxis.zoom(0, 1);
+        // Используем setTimeout для корректного обновления после смены данных
+        setTimeout(() => {
+            if (xAxis) {
+                xAxis.zoomToValues(chartData[0].date, chartData[chartData.length - 1].date);
+            }
+        }, 100);
+        
+        console.log(`Chart updated: ${chartData.length} candles for ${timeframe}`);
+        console.log(`Date range: ${new Date(chartData[0].date).toISOString()} to ${new Date(chartData[chartData.length - 1].date).toISOString()}`);
     }
 }
 
