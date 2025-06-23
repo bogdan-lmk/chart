@@ -1,16 +1,18 @@
-import { setupChart, setupBitcoinChart, updateBitcoinChart, disposeBitcoinChart } from './chart';
-import { data, getBitcoinDataForTimeframe, getTimeframeInfo, type Timeframe } from './dataService';
-import { addTradingSignals } from './chart';
-import { fetchTradingSignals } from './signalsService';
+// src/main.ts - Исправленная версия
 
-let currentSignals: any[] = [];
+import { setupChart, setupBitcoinChart, updateBitcoinChart, disposeBitcoinChart, addTradingSignals } from './chart';
+import { data, getBitcoinDataForTimeframe, getTimeframeInfo, type Timeframe } from './dataService';
+import { fetchTradingSignals, getMockSignals } from './signalsService';
+import { TradingSignal } from './types/signals';
+
+let currentSignals: TradingSignal[] = [];
 
 // Current selected timeframe
 let currentTimeframe: Timeframe = '15m';
 
 // Use Unix timestamps directly for the indicator chart
 const chartData = data.map(point => ({
-  time: point.time, // Use Unix timestamp directly
+  time: point.time,
   values: point.value,
   total: point.total
 }));
@@ -25,10 +27,21 @@ async function initializeCharts(): Promise<void> {
   // Загружаем начальные сигналы
   try {
     currentSignals = await fetchTradingSignals('BTC', currentTimeframe);
+    console.log('Fetched signals:', currentSignals);
     addTradingSignals(currentSignals);
     console.log(`Initial signals loaded: ${currentSignals.length}`);
   } catch (error) {
     console.error('Error loading initial signals:', error);
+    // Используем тестовые сигналы даже при ошибке
+    currentSignals = getMockSignals();
+    console.log('Mock signals:', currentSignals);
+    addTradingSignals(currentSignals);
+    console.log(`Using mock signals: ${currentSignals.length}`);
+    
+    // Проверяем, что сигналы добавлены
+    setTimeout(() => {
+      console.log('Current signals after adding:', currentSignals);
+    }, 1000);
   }
 }
 
@@ -116,15 +129,13 @@ function logAggregationInfo(): void {
   timeframes.forEach(tf => {
     const data = getBitcoinDataForTimeframe(tf);
     const info = getTimeframeInfo(tf);
-    console.log(`${tf}: ${data.length} candles (${info.interval}, ${info.multiplier}x aggregation)`);
+    console.log(`${tf}: ${data.length} candles (${info.interval})`);
   });
-
 }
 
 // Main initialization
 function main(): void {
   try {
-    // Wait for DOM to be ready
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => {
         initializeApplication();
@@ -140,7 +151,7 @@ function main(): void {
 async function initializeApplication(): Promise<void> {
   setupErrorHandling();
   
-  await initializeCharts(); // Теперь async
+  await initializeCharts();
   
   setupTimeframeSelector();
   setupCleanup();

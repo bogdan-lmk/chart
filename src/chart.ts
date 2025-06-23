@@ -1,3 +1,5 @@
+// src/chart.ts - Исправленная версия
+
 import { createChart, LineSeries, HistogramSeries, ColorType } from 'lightweight-charts';
 import type { UTCTimestamp } from 'lightweight-charts';
 import * as am5 from "@amcharts/amcharts5";
@@ -13,6 +15,16 @@ interface DataPoint {
     time: UTCTimestamp;
     total: number;
     values: number;
+}
+
+// Интерфейс для данных свечей
+interface CandleDataItem {
+    date: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
 }
 
 const CHART_CONTAINER_ID = 'chart';
@@ -48,13 +60,11 @@ export function setupChart(dataPoints: DataPoint[]): void {
     if (!container) return;
 
     const chart = createChart(container, DEFAULT_CHART_OPTIONS);
-    // Add histogram series for 'total' values
     const histogramSeries = chart.addSeries(HistogramSeries, { color: '#26a69a' });
     const histogramData = dataPoints.map(({ time, total }) => ({ time, value: total }));
     histogramSeries.setData(histogramData);
 
     const lineSeries = chart.addSeries(LineSeries, {color: SERIES_COLOR});
-    // Cast time to UTCTimestamp to satisfy TypeScript nominal type
     const data = dataPoints.map(({ time, values }) => ({ time: time , value: values }));
     lineSeries.setData(data);
     chart.timeScale().fitContent();
@@ -69,18 +79,13 @@ export function setupBitcoinChart(ohlcData: OHLCDataPoint[], timeframe: Timefram
     const container = getBtcChartContainer();
     if (!container) return;
 
-    // Dispose existing chart if it exists
     if (btcChart) {
         btcChart.dispose();
     }
 
-    // Create root element
     btcChart = am5.Root.new(container);
-
-    // Set themes
     btcChart.setThemes([am5themes_Animated.new(btcChart)]);
 
-    // Create chart
     const chart = btcChart.container.children.push(
         am5xy.XYChart.new(btcChart, {
             panX: true,
@@ -91,46 +96,35 @@ export function setupBitcoinChart(ohlcData: OHLCDataPoint[], timeframe: Timefram
         })
     );
 
-    // Get timeframe interval
     const baseInterval = TIMEFRAME_INTERVALS[timeframe];
 
-    // Create X-axis (DateTime) with proper interval - убираем ограничения
     xAxis = chart.xAxes.push(
         am5xy.DateAxis.new(btcChart, {
-            // Убираем maxZoomCount - это ограничивает количество отображаемых свечей
             maxZoomCount: undefined,
-            // Устанавливаем минимальное количество для отображения всех данных
             minZoomCount: 1,
             baseInterval: baseInterval,
             renderer: am5xy.AxisRendererX.new(btcChart, {
                 minorGridEnabled: true,
-                // Уменьшаем минимальное расстояние для отображения большего количества меток
                 minGridDistance: 30
             }),
             tooltip: am5.Tooltip.new(btcChart, {}),
-            // Отключаем автоматическое скрытие меток
             strictMinMax: false
         })
     );
 
-    // Create Y-axis (Value) - улучшаем масштабирование
     const yAxis = chart.yAxes.push(
         am5xy.ValueAxis.new(btcChart, {
             renderer: am5xy.AxisRendererY.new(btcChart, {
                 pan: "zoom",
-                // Улучшаем отображение меток на Y оси
                 minGridDistance: 20
             }),
             tooltip: am5.Tooltip.new(btcChart, {}),
-            // Автоматическое масштабирование по данным
             strictMinMax: false,
-            // Добавляем небольшие отступы сверху и снизу
             extraMin: 0.02,
             extraMax: 0.02
         })
     );
 
-    // Create candlestick series
     candlestickSeries = chart.series.push(
         am5xy.CandlestickSeries.new(btcChart, {
             name: `BTC/USD (${timeframe})`,
@@ -148,9 +142,8 @@ export function setupBitcoinChart(ohlcData: OHLCDataPoint[], timeframe: Timefram
         })
     );
 
-    // Transform data for amCharts5
     const chartData = ohlcData.map(point => ({
-        date: point.time * 1000, // Convert to milliseconds
+        date: point.time * 1000,
         open: point.open,
         high: point.high,
         low: point.low,
@@ -158,18 +151,16 @@ export function setupBitcoinChart(ohlcData: OHLCDataPoint[], timeframe: Timefram
         volume: point.volume
     }));
 
-    // Set data
+    // Сохраняем данные свечей в глобальной переменной для mock-сигналов
+    (window as any).__candleData = chartData;
     candlestickSeries.data.setAll(chartData);
 
-    // Add cursor
     const cursor = chart.set("cursor", am5xy.XYCursor.new(btcChart, {
         behavior: "none"
     }));
     cursor.lineY.set("visible", false);
 
-    // Настраиваем начальный зум для отображения всех данных
     if (chartData.length > 0) {
-        // Показываем все данные при загрузке - используем setTimeout для корректной инициализации
         setTimeout(() => {
             if (xAxis) {
                 xAxis.zoomToValues(chartData[0].date, chartData[chartData.length - 1].date);
@@ -177,30 +168,24 @@ export function setupBitcoinChart(ohlcData: OHLCDataPoint[], timeframe: Timefram
         }, 100);
     }
 
-    // Make chart appear animated
     candlestickSeries.appear(1000);
     chart.appear(1000, 100);
 
     console.log(`Bitcoin chart setup complete: ${chartData.length} candles for ${timeframe}`);
 }
 
-// Update Bitcoin chart with new timeframe data
 export function updateBitcoinChart(ohlcData: OHLCDataPoint[], timeframe: Timeframe): void {
     if (!candlestickSeries || !xAxis || !btcChart) {
         setupBitcoinChart(ohlcData, timeframe);
         return;
     }
 
-    // Update base interval for the new timeframe
     const baseInterval = TIMEFRAME_INTERVALS[timeframe];
     xAxis.set("baseInterval", baseInterval);
-
-    // Update series name
     candlestickSeries.set("name", `BTC/USD (${timeframe})`);
 
-    // Transform data for amCharts5
     const chartData = ohlcData.map(point => ({
-        date: point.time * 1000, // Convert to milliseconds
+        date: point.time * 1000,
         open: point.open,
         high: point.high,
         low: point.low,
@@ -208,12 +193,9 @@ export function updateBitcoinChart(ohlcData: OHLCDataPoint[], timeframe: Timefra
         volume: point.volume
     }));
 
-    // Update data with animation
     candlestickSeries.data.setAll(chartData);
     
-    // Показываем все данные после обновления
     if (chartData.length > 0) {
-        // Используем setTimeout для корректного обновления после смены данных
         setTimeout(() => {
             if (xAxis) {
                 xAxis.zoomToValues(chartData[0].date, chartData[chartData.length - 1].date);
@@ -221,103 +203,133 @@ export function updateBitcoinChart(ohlcData: OHLCDataPoint[], timeframe: Timefra
         }, 100);
         
         console.log(`Chart updated: ${chartData.length} candles for ${timeframe}`);
-        console.log(`Date range: ${new Date(chartData[0].date).toISOString()} to ${new Date(chartData[chartData.length - 1].date).toISOString()}`);
     }
 }
 
-// Добавить эту функцию в конец файла
-export function addTradingSignals(signals: TradingSignal[]): void {
-  if (!btcChart || !candlestickSeries || !xAxis) {
-    console.warn('Bitcoin chart not initialized');
-    return;
-  }
+// Функция для добавления сигналов
+export function addTradingSignals(signals: TradingSignal[], offsetRatio: number = 0.1): void {
+    if (!btcChart || !candlestickSeries || !xAxis) {
+        console.warn('Bitcoin chart not initialized');
+        return;
+    }
 
-  // Удаляем предыдущие сигналы
-  if (signalSeries) {
-    signalSeries.dispose();
-    signalSeries = null;
-  }
+    if (signalSeries) {
+        signalSeries.dispose();
+        signalSeries = null;
+    }
 
-  // Создаем серию для сигналов
-  signalSeries = candlestickSeries.chart!.series.push(
-    am5xy.LineSeries.new(btcChart, {
-      name: "Trading Signals",
-      xAxis: xAxis,
-      yAxis: candlestickSeries.get("yAxis"),
-      valueYField: "value",
-      valueXField: "date",
-      visible: false // Скрываем линию
-    })
-  );
-
-  // Получаем данные свечей
-  const candleData = candlestickSeries.data.values;
-  
-  // Подготавливаем данные сигналов
-  const signalData = signals.map(signal => {
-    const signalTime = signal.timestamp * 1000;
-    
-    // Находим ближайшую свечу
-    const nearestCandle = candleData.find((candle: any) => 
-      Math.abs(candle.date - signalTime) < 900000 // 15 минут
+    signalSeries = candlestickSeries.chart!.series.push(
+        am5xy.LineSeries.new(btcChart, {
+            xAxis: xAxis,
+            yAxis: candlestickSeries.get("yAxis"),
+            valueYField: "value",
+            valueXField: "date",
+            visible: true
+        })
     );
-    
-    if (!nearestCandle) return null;
-    
-    // Позиция сигнала
-    const offset = (nearestCandle.high - nearestCandle.low) * 0.15;
-    const signalValue = signal.signal === 'buy' 
-      ? nearestCandle.low - offset
-      : nearestCandle.high + offset;
-    
-    return {
-      date: signalTime,
-      value: signalValue,
-      signal: signal.signal
-    };
-  }).filter(Boolean);
 
-  signalSeries.data.setAll(signalData);
+    const candleData = candlestickSeries.data.values as CandleDataItem[];
+    const signalsByCandle = new Map<number, TradingSignal>();
 
-  // Создаем маркеры
-  signalSeries.set("bullet", function(root, series, dataItem) {
-    const container = am5.Container.new(root, {});
-    const signalType = dataItem.dataContext.signal;
-    
-    // Треугольник
-    container.children.push(
-      am5.Graphics.new(root, {
-        centerX: am5.p50,
-        centerY: am5.p50,
-        fill: signalType === 'buy' ? am5.color("#00C851") : am5.color("#FF4444"),
-        stroke: am5.color("#FFFFFF"),
-        strokeWidth: 2,
-        draw: function(display) {
-          if (signalType === 'buy') {
-            // Треугольник вверх
-            display.moveTo(0, 8);
-            display.lineTo(-6, -4);
-            display.lineTo(6, -4);
-            display.lineTo(0, 8);
-          } else {
-            // Треугольник вниз
-            display.moveTo(0, -8);
-            display.lineTo(-6, 4);
-            display.lineTo(6, 4);
-            display.lineTo(0, -8);
-          }
+    for (const signal of signals) {
+        const signalTime = signal.timestamp * 1000;
+
+        let closestCandle = candleData[0];
+        let minDiff = Math.abs(candleData[0].date - signalTime);
+
+        for (const candle of candleData) {
+            const diff = Math.abs(candle.date - signalTime);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestCandle = candle;
+            }
         }
-      })
-    );
 
-    return am5.Bullet.new(root, {
-      sprite: container
+        signalsByCandle.set(closestCandle.date, signal);
+    }
+
+    const signalData = Array.from(signalsByCandle.entries()).map(([candleDate, signal]) => {
+        const signalTime = signal.timestamp * 1000;
+        const exactCandle = candleData.find(c => c.date === candleDate);
+        if (!exactCandle) return null;
+
+        if (!candlestickSeries) return null;
+        const timeframe = candlestickSeries.get("name", "")?.match(/\((.*?)\)/)?.[1] as Timeframe || '15m';
+        const maxDiff = {
+            '15m': 15 * 60 * 1000,
+            '1h': 30 * 60 * 1000,
+            '4h': 2 * 60 * 60 * 1000,
+            '12h': 6 * 60 * 60 * 1000,
+            '1d': 12 * 60 * 60 * 1000
+        }[timeframe];
+
+        const signalDiff = Math.abs(exactCandle.date - signalTime);
+        if (signalDiff > maxDiff) return null;
+
+        const candleRange = exactCandle.high - exactCandle.low || 1;
+        const visualOffset = candleRange * offsetRatio;
+
+        if (!candlestickSeries?.get("yAxis")) return null;
+        let signalValue = signal.signal === 'buy'
+            ? exactCandle.low - visualOffset
+            : exactCandle.high + visualOffset;
+
+        const yAxisMin = candleData.reduce((min, c) => Math.min(min, c.low), Infinity);
+        const yAxisMax = candleData.reduce((max, c) => Math.max(max, c.high), -Infinity);
+
+        const finalValue = Math.min(Math.max(signalValue, yAxisMin * 0.95), yAxisMax * 1.05);
+
+        return {
+            date: signalTime,
+            value: finalValue,
+            signal: signal.signal
+        };
+    }).filter((item): item is NonNullable<typeof item> => item !== null);
+
+    signalSeries.data.setAll(signalData);
+
+    signalSeries.set("visible", true);
+    signalSeries.set("stroke", am5.color("#fff")); // Невидимая линия
+
+    signalSeries.bullets.push(() => {
+        const label = am5.Label.new(btcChart!, {
+            text: "{signal}",
+            fontSize: 6,
+            fontWeight: "bold",
+            centerX: am5.p50,
+            centerY: am5.p50,
+            populateText: true,
+            tooltipText: "{signal} signal at {date}\nPrice: {valueY}"
+        });
+
+        label.adapters.add("fill", () => am5.color("#fff"));
+        label.adapters.add("background", (_, target) => {
+            const dataItem = target.dataItem as any;
+            return dataItem?.dataContext?.signal === "buy"
+                ? am5.Rectangle.new(btcChart!, {
+                    fill: am5.color("#00ff00"),
+                    stroke: am5.color("#00ff00"),
+                    strokeOpacity: 0,
+                    width: 12,
+                    height: 12
+                })
+                : am5.Rectangle.new(btcChart!, {
+                    fill: am5.color("#ff0000"),
+                    stroke: am5.color("#ff0000"),
+                    strokeOpacity: 0,
+                    width: 12,
+                    height: 12
+                });
+        });
+
+        return am5.Bullet.new(btcChart!, {
+            sprite: label
+        });
     });
-  });
 
-  console.log(`Added ${signalData.length} trading signals`);
+    signalSeries.set("name", "");
+    console.log(`Added ${signalData.length} trading signals`);
 }
-
 
 
 // Cleanup function

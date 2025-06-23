@@ -171,6 +171,33 @@ button:hover {
     box-sizing: border-box;
 }
 
+/* Signal styles */
+.signal-buy {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    background-color: #00ff00;
+    color: #000000;
+    font-size: 14px;
+    text-align: center;
+    line-height: 10px;
+    padding: 5px;
+    border-radius: 2px;
+}
+
+.signal-sell {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    background-color: #ff0000;
+    color: #000000;
+    font-size: 14px;
+    text-align: center;
+    line-height: 10px;
+    padding: 5px;
+    border-radius: 2px;
+}
+
 
 @media (max-width: 875px) {
 
