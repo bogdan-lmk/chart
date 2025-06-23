@@ -3,7 +3,11 @@ import type { UTCTimestamp } from 'lightweight-charts';
 import * as am5 from "@amcharts/amcharts5";
 import * as am5xy from "@amcharts/amcharts5/xy";
 import am5themes_Animated from "@amcharts/amcharts5/themes/Animated";
+
 import type { OHLCDataPoint, Timeframe } from './dataService';
+import { TradingSignal } from './types/signals';
+
+let signalSeries: am5xy.LineSeries | null = null;
 
 interface DataPoint {
     time: UTCTimestamp;
@@ -221,8 +225,107 @@ export function updateBitcoinChart(ohlcData: OHLCDataPoint[], timeframe: Timefra
     }
 }
 
+// Добавить эту функцию в конец файла
+export function addTradingSignals(signals: TradingSignal[]): void {
+  if (!btcChart || !candlestickSeries || !xAxis) {
+    console.warn('Bitcoin chart not initialized');
+    return;
+  }
+
+  // Удаляем предыдущие сигналы
+  if (signalSeries) {
+    signalSeries.dispose();
+    signalSeries = null;
+  }
+
+  // Создаем серию для сигналов
+  signalSeries = candlestickSeries.chart!.series.push(
+    am5xy.LineSeries.new(btcChart, {
+      name: "Trading Signals",
+      xAxis: xAxis,
+      yAxis: candlestickSeries.get("yAxis"),
+      valueYField: "value",
+      valueXField: "date",
+      visible: false // Скрываем линию
+    })
+  );
+
+  // Получаем данные свечей
+  const candleData = candlestickSeries.data.values;
+  
+  // Подготавливаем данные сигналов
+  const signalData = signals.map(signal => {
+    const signalTime = signal.timestamp * 1000;
+    
+    // Находим ближайшую свечу
+    const nearestCandle = candleData.find((candle: any) => 
+      Math.abs(candle.date - signalTime) < 900000 // 15 минут
+    );
+    
+    if (!nearestCandle) return null;
+    
+    // Позиция сигнала
+    const offset = (nearestCandle.high - nearestCandle.low) * 0.15;
+    const signalValue = signal.signal === 'buy' 
+      ? nearestCandle.low - offset
+      : nearestCandle.high + offset;
+    
+    return {
+      date: signalTime,
+      value: signalValue,
+      signal: signal.signal
+    };
+  }).filter(Boolean);
+
+  signalSeries.data.setAll(signalData);
+
+  // Создаем маркеры
+  signalSeries.set("bullet", function(root, series, dataItem) {
+    const container = am5.Container.new(root, {});
+    const signalType = dataItem.dataContext.signal;
+    
+    // Треугольник
+    container.children.push(
+      am5.Graphics.new(root, {
+        centerX: am5.p50,
+        centerY: am5.p50,
+        fill: signalType === 'buy' ? am5.color("#00C851") : am5.color("#FF4444"),
+        stroke: am5.color("#FFFFFF"),
+        strokeWidth: 2,
+        draw: function(display) {
+          if (signalType === 'buy') {
+            // Треугольник вверх
+            display.moveTo(0, 8);
+            display.lineTo(-6, -4);
+            display.lineTo(6, -4);
+            display.lineTo(0, 8);
+          } else {
+            // Треугольник вниз
+            display.moveTo(0, -8);
+            display.lineTo(-6, 4);
+            display.lineTo(6, 4);
+            display.lineTo(0, -8);
+          }
+        }
+      })
+    );
+
+    return am5.Bullet.new(root, {
+      sprite: container
+    });
+  });
+
+  console.log(`Added ${signalData.length} trading signals`);
+}
+
+
+
 // Cleanup function
 export function disposeBitcoinChart(): void {
+    if (signalSeries) {
+        signalSeries.dispose();
+        signalSeries = null;
+    }
     if (btcChart) {
         btcChart.dispose();
         btcChart = null;

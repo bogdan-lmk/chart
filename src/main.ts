@@ -1,5 +1,9 @@
 import { setupChart, setupBitcoinChart, updateBitcoinChart, disposeBitcoinChart } from './chart';
 import { data, getBitcoinDataForTimeframe, getTimeframeInfo, type Timeframe } from './dataService';
+import { addTradingSignals } from './chart';
+import { fetchTradingSignals } from './signalsService';
+
+let currentSignals: any[] = [];
 
 // Current selected timeframe
 let currentTimeframe: Timeframe = '15m';
@@ -12,18 +16,20 @@ const chartData = data.map(point => ({
 }));
 
 // Initialize charts
-function initializeCharts(): void {
-  // Initialize the indicator chart with data from dataService
+async function initializeCharts(): Promise<void> {
   setupChart(chartData);
   
-  // Initialize Bitcoin OHLC chart with default timeframe
   const btcData = getBitcoinDataForTimeframe(currentTimeframe);
   setupBitcoinChart(btcData, currentTimeframe);
   
-  // Log initial data info
-  const timeframeInfo = getTimeframeInfo(currentTimeframe);
-  console.log(`Bitcoin chart initialized with ${currentTimeframe} (${timeframeInfo.interval})`);
-  console.log(`Data points: ${btcData.length}`);
+  // Загружаем начальные сигналы
+  try {
+    currentSignals = await fetchTradingSignals('BTC', currentTimeframe);
+    addTradingSignals(currentSignals);
+    console.log(`Initial signals loaded: ${currentSignals.length}`);
+  } catch (error) {
+    console.error('Error loading initial signals:', error);
+  }
 }
 
 // Setup timeframe selector
@@ -31,22 +37,20 @@ function setupTimeframeSelector(): void {
   const timeframeButtons = document.querySelectorAll('.timeframe-btn');
   
   timeframeButtons.forEach(button => {
-    button.addEventListener('click', (event) => {
+    button.addEventListener('click', async (event) => {
       const target = event.target as HTMLButtonElement;
       const timeframe = target.dataset.timeframe as Timeframe;
       
       if (timeframe && timeframe !== currentTimeframe) {
-        // Show loading state
         target.disabled = true;
         target.textContent = 'Loading...';
         
         try {
-          // Update active button
+          // Обновляем активную кнопку
           timeframeButtons.forEach(btn => {
             const button = btn as HTMLButtonElement;
             button.classList.remove('active');
             button.disabled = false;
-            // Restore original text
             const originalTimeframe = button.dataset.timeframe;
             if (originalTimeframe) {
               button.textContent = originalTimeframe;
@@ -54,32 +58,25 @@ function setupTimeframeSelector(): void {
           });
           target.classList.add('active');
           
-          // Update current timeframe
           currentTimeframe = timeframe;
           
-          // Get new data for the timeframe
+          // Получаем новые данные
           const newBtcData = getBitcoinDataForTimeframe(timeframe);
-          
-          // Update Bitcoin chart with new timeframe data
           updateBitcoinChart(newBtcData, timeframe);
           
-          // Log timeframe change
-          const timeframeInfo = getTimeframeInfo(timeframe);
-          console.log(`Switched to ${timeframe} (${timeframeInfo.interval})`);
-          console.log(`Data points: ${newBtcData.length}`);
-          console.log(`Multiplier: ${timeframeInfo.multiplier}x 15m periods`);
+          // Загружаем и отображаем сигналы
+          currentSignals = await fetchTradingSignals('BTC', timeframe);
+          addTradingSignals(currentSignals);
           
-          // Restore button text
+          console.log(`Switched to ${timeframe}, loaded ${currentSignals.length} signals`);
+          
           target.textContent = timeframe;
           
         } catch (error) {
           console.error('Error switching timeframe:', error);
-          
-          // Restore button state on error
           target.classList.remove('active');
           target.textContent = timeframe;
           
-          // Re-activate previous timeframe button
           const prevButton = document.querySelector(`[data-timeframe="${currentTimeframe}"]`);
           if (prevButton) {
             prevButton.classList.add('active');
@@ -121,8 +118,7 @@ function logAggregationInfo(): void {
     const info = getTimeframeInfo(tf);
     console.log(`${tf}: ${data.length} candles (${info.interval}, ${info.multiplier}x aggregation)`);
   });
-  
-  console.log('=====================================');
+
 }
 
 // Main initialization
@@ -141,25 +137,16 @@ function main(): void {
   }
 }
 
-function initializeApplication(): void {
-  // Setup error handling
+async function initializeApplication(): Promise<void> {
   setupErrorHandling();
   
-  // Initialize charts
-  initializeCharts();
+  await initializeCharts(); // Теперь async
   
-  // Setup timeframe selector
   setupTimeframeSelector();
-  
-  // Setup cleanup
   setupCleanup();
-  
-  // Log debug info
   logAggregationInfo();
   
   console.log('Application initialized successfully');
-  console.log(`Indicator data points: ${data.length}`);
-  console.log(`Default timeframe: ${currentTimeframe}`);
 }
 
 // Start the application
