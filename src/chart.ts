@@ -193,6 +193,9 @@ export function updateBitcoinChart(ohlcData: OHLCDataPoint[], timeframe: Timefra
         volume: point.volume
     }));
 
+    // Update global candle data so mock signals align with the current timeframe
+    (window as any).__candleData = chartData;
+
     candlestickSeries.data.setAll(chartData);
     
     if (chartData.length > 0) {
@@ -289,17 +292,24 @@ export function addTradingSignals(signals: TradingSignal[], offsetRatio: number 
     signalSeries.data.setAll(signalData);
 
     signalSeries.set("visible", true);
-    signalSeries.set("stroke", am5.color("#fff")); // Невидимая линия
+    // Hide the line that connects signal markers
+    signalSeries.strokes.template.setAll({ strokeOpacity: 0 });
 
     signalSeries.bullets.push(() => {
         const label = am5.Label.new(btcChart!, {
             text: "{signal}",
-            fontSize: 6,
+            fontSize: 10,
             fontWeight: "bold",
             centerX: am5.p50,
             centerY: am5.p50,
             populateText: true,
             tooltipText: "{signal} signal at {date}\nPrice: {valueY}"
+        });
+
+        label.adapters.add("text", (text, target) => {
+            const dataItem = target.dataItem as any;
+            const value = dataItem?.dataContext?.signal;
+            return value ? value.toUpperCase() : text;
         });
 
         label.adapters.add("fill", () => am5.color("#fff"));
@@ -310,15 +320,15 @@ export function addTradingSignals(signals: TradingSignal[], offsetRatio: number 
                     fill: am5.color("#00ff00"),
                     stroke: am5.color("#00ff00"),
                     strokeOpacity: 0,
-                    width: 12,
-                    height: 12
+                    width: 20,
+                    height: 20
                 })
                 : am5.Rectangle.new(btcChart!, {
                     fill: am5.color("#ff0000"),
                     stroke: am5.color("#ff0000"),
                     strokeOpacity: 0,
-                    width: 12,
-                    height: 12
+                    width: 20,
+                    height: 20
                 });
         });
 
