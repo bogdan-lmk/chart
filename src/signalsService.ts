@@ -4,8 +4,8 @@ import { TradingSignal } from './types/signals';
 import { Timeframe } from './dataService';
 
 export async function fetchTradingSignals(
-  ticker: string = 'BTC', 
-  timeframe: Timeframe
+  _ticker: string = 'BTC',
+  _timeframe: Timeframe
 ): Promise<TradingSignal[]> {
   try {
     // Временное решение - используем mock-данные

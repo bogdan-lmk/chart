@@ -46,6 +46,15 @@ const TIMEFRAME_INTERVALS: Record<Timeframe, any> = {
     '1d': { timeUnit: "day", count: 1 }
 };
 
+// Offset ratios for signal markers depending on timeframe
+const OFFSET_RATIOS: Record<Timeframe, number> = {
+    '15m': 0.1,
+    '1h': 0.08,
+    '4h': 0.06,
+    '12h': 0.05,
+    '1d': 0.04
+};
+
 function getChartContainer(): HTMLElement | null {
     return document.getElementById(CHART_CONTAINER_ID);
 }
@@ -210,7 +219,7 @@ export function updateBitcoinChart(ohlcData: OHLCDataPoint[], timeframe: Timefra
 }
 
 // Функция для добавления сигналов
-export function addTradingSignals(signals: TradingSignal[], offsetRatio: number = 0.1): void {
+export function addTradingSignals(signals: TradingSignal[], offsetRatio?: number): void {
     if (!btcChart || !candlestickSeries || !xAxis) {
         console.warn('Bitcoin chart not initialized');
         return;
@@ -266,11 +275,13 @@ export function addTradingSignals(signals: TradingSignal[], offsetRatio: number 
             '1d': 12 * 60 * 60 * 1000
         }[timeframe];
 
+        const ratio = offsetRatio ?? OFFSET_RATIOS[timeframe];
+
         const signalDiff = Math.abs(exactCandle.date - signalTime);
         if (signalDiff > maxDiff) return null;
 
         const candleRange = exactCandle.high - exactCandle.low || 1;
-        const visualOffset = candleRange * offsetRatio;
+        const visualOffset = candleRange * ratio;
 
         if (!candlestickSeries?.get("yAxis")) return null;
         let signalValue = signal.signal === 'buy'
@@ -283,7 +294,7 @@ export function addTradingSignals(signals: TradingSignal[], offsetRatio: number 
         const finalValue = Math.min(Math.max(signalValue, yAxisMin * 0.95), yAxisMax * 1.05);
 
         return {
-            date: signalTime,
+            date: candleDate,
             value: finalValue,
             signal: signal.signal
         };
@@ -294,40 +305,22 @@ export function addTradingSignals(signals: TradingSignal[], offsetRatio: number 
     signalSeries.set("visible", true);
     signalSeries.set("stroke", am5.color("#fff")); // Невидимая линия
 
-    signalSeries.bullets.push(() => {
-        const label = am5.Label.new(btcChart!, {
-            text: "{signal}",
-            fontSize: 6,
-            fontWeight: "bold",
+    signalSeries.bullets.push((_root, _series, dataItem) => {
+        const ctx = dataItem.dataContext as any;
+        const isBuy = ctx?.signal === "buy";
+        const color = isBuy ? am5.color("#00ff00") : am5.color("#ff0000");
+        const triangle = am5.Triangle.new(btcChart!, {
+            width: 10,
+            height: 10,
+            fill: color,
+            stroke: color,
             centerX: am5.p50,
             centerY: am5.p50,
-            populateText: true,
+            rotation: isBuy ? 0 : 180,
             tooltipText: "{signal} signal at {date}\nPrice: {valueY}"
         });
 
-        label.adapters.add("fill", () => am5.color("#fff"));
-        label.adapters.add("background", (_, target) => {
-            const dataItem = target.dataItem as any;
-            return dataItem?.dataContext?.signal === "buy"
-                ? am5.Rectangle.new(btcChart!, {
-                    fill: am5.color("#00ff00"),
-                    stroke: am5.color("#00ff00"),
-                    strokeOpacity: 0,
-                    width: 12,
-                    height: 12
-                })
-                : am5.Rectangle.new(btcChart!, {
-                    fill: am5.color("#ff0000"),
-                    stroke: am5.color("#ff0000"),
-                    strokeOpacity: 0,
-                    width: 12,
-                    height: 12
-                });
-        });
-
-        return am5.Bullet.new(btcChart!, {
-            sprite: label
-        });
+        return am5.Bullet.new(btcChart!, { sprite: triangle });
     });
 
     signalSeries.set("name", "");
