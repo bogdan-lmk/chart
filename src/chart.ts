@@ -30,6 +30,7 @@ interface CandleDataItem {
 const CHART_CONTAINER_ID = 'chart';
 const BTC_CHART_CONTAINER_ID = 'btc-chart';
 const SERIES_COLOR = '#2962FF';
+
 const DEFAULT_CHART_OPTIONS = {
     layout: {
         textColor: 'black',
@@ -48,11 +49,11 @@ const TIMEFRAME_INTERVALS: Record<Timeframe, any> = {
 
 // Offset ratios for signal markers depending on timeframe
 const OFFSET_RATIOS: Record<Timeframe, number> = {
-    '15m': 0.1,
-    '1h': 0.08,
-    '4h': 0.06,
-    '12h': 0.05,
-    '1d': 0.04
+    '15m': 0.5,
+    '1h': 0.3,
+    '4h': 0.1,
+    '12h': 0.1,
+    '1d': 0.1
 };
 
 function getChartContainer(): HTMLElement | null {
@@ -303,7 +304,7 @@ export function addTradingSignals(signals: TradingSignal[], offsetRatio?: number
     signalSeries.data.setAll(signalData);
 
     signalSeries.set("visible", true);
-    signalSeries.set("stroke", am5.color("#fff")); // Невидимая линия
+    signalSeries.strokes.template.setAll({ strokeOpacity: 0 });
 
     signalSeries.bullets.push((_root, _series, dataItem) => {
         const ctx = dataItem.dataContext as any;
