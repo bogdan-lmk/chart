@@ -24,7 +24,6 @@ export type Timeframe = '15m' | '1h' | '4h' | '12h' | '1d';
 
 // Calculate milliseconds for each timeframe
 function getTimeframeMs(timeframe: Timeframe): number {
-  const now = new Date();
   const msMap: Record<Timeframe, number> = {
     '15m': 15 * 60 * 1000,
     '1h': 60 * 60 * 1000,
