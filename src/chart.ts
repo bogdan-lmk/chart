@@ -193,6 +193,9 @@ export function updateBitcoinChart(ohlcData: OHLCDataPoint[], timeframe: Timefra
         volume: point.volume
     }));
 
+    // Update global candle data so mock signals align with the current timeframe
+    (window as any).__candleData = chartData;
+
     candlestickSeries.data.setAll(chartData);
     
     if (chartData.length > 0) {
